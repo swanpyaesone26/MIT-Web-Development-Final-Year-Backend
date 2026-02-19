@@ -39,4 +39,4 @@ jobs:
     
     - name: Analysing the code with pylint
       run: |
-        poetry run pylint AgentProject/AgentProject/ AgentProject/apps/ AgentProject/agents/ --disable=C0114,C0115,C0116 --ignore-patterns="migrations/*" --recursive=y --exit-zero
+        poetry run pylint app/ --disable=C0114,C0115,C0116 --ignore-patterns="migrations/*" --recursive=y --exit-zero
