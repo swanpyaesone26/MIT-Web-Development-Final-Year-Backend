@@ -15,7 +15,7 @@ dependencies = [
     "django-filter (>=25.2,<26.0)"
 ]
 
-[tools.poetry]
+[tool.poetry]
 package-mode = false
 
 [build-system]
