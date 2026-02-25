@@ -41,6 +41,7 @@ class Assignment(models.Model):
     rooms = models.ManyToManyField('Room')
     student = models.ForeignKey(Student, on_delete=models.CASCADE)
     score = models.FloatField()
+    due_date = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
