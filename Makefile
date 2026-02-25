@@ -1,5 +1,5 @@
 migrate:
-	poetry run python manage.py make migrations
+	poetry run python manage.py makemigrations
 	poetry run python manage.py migrate
 
 run:
