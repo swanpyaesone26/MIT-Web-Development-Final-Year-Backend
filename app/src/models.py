@@ -4,10 +4,9 @@ from django.db import models
 class Teacher(models.Model):
     teacher_id = models.AutoField(primary_key=True)
     teacher_name = models.CharField(max_length=100)
-    subject_id = models.ForeignKey('Subject',on_delete=models.CASCADE)
-    year_id =models.ForeignKey('Year',on_delete=models.CASCADE)
+    subject = models.OneToOneField('Subject', on_delete=models.CASCADE)
+    year = models.OneToOneField('Year', on_delete=models.CASCADE)
     password = models.CharField(max_length=100)
-    room_id = models.ForeignKey('Room',on_delete=models.CASCADE)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -21,8 +20,8 @@ class Teacher(models.Model):
 class Student(models.Model):
     student_id = models.AutoField(primary_key=True)
     student_name = models.CharField(max_length=100)
-    room_id = models.ForeignKey('Room',on_delete=models.CASCADE)
-    year_id = models.ForeignKey('Year',on_delete=models.CASCADE)
+    rooms = models.ManyToManyField('Room')
+    year = models.OneToOneField('Year', on_delete=models.CASCADE)
     password = models.CharField(max_length=100)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -36,11 +35,11 @@ class Student(models.Model):
 #assignment db
 class Assignment(models.Model):
     assignment_id = models.AutoField(primary_key=True)
-    teacher_id = models.ForeignKey(Teacher,on_delete=models.CASCADE)
+    teacher = models.ForeignKey(Teacher, on_delete=models.CASCADE)
     assignment_name = models.CharField(max_length=250)
-    subject_id = models.ForeignKey('Subject',on_delete=models.CASCADE)
-    room_id = models.ForeignKey('Room',on_delete=models.CASCADE)
-    student_id = models.ForeignKey(Student,on_delete=models.CASCADE)
+    subject = models.ForeignKey('Subject', on_delete=models.CASCADE)
+    rooms = models.ManyToManyField('Room')
+    student = models.ForeignKey(Student, on_delete=models.CASCADE)
     score = models.FloatField()
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -68,9 +67,9 @@ class Year(models.Model):
 class Room(models.Model):
     room_id = models.AutoField(primary_key=True)
     room_name = models.CharField(max_length=100)
-    teacher_id = models.ForeignKey('Teacher',on_delete=models.CASCADE)
-    subject_id = models.ForeignKey('Subject',on_delete=models.CASCADE)
-    year_id = models.ForeignKey('Year',on_delete=models.CASCADE)
+    teacher = models.OneToOneField('Teacher', on_delete=models.CASCADE)
+    subject = models.OneToOneField('Subject', on_delete=models.CASCADE)
+    year = models.OneToOneField('Year', on_delete=models.CASCADE)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
