@@ -66,7 +66,7 @@ class Year(models.Model):
 #room db
 class Room(models.Model):
     room_id = models.AutoField(primary_key=True)
-    room_name = models.CharField(max_length=100)
+    room_name = models.CharField(max_length=100, unique=True)
     teacher = models.OneToOneField('Teacher', on_delete=models.CASCADE)
     subject = models.OneToOneField('Subject', on_delete=models.CASCADE)
     year = models.OneToOneField('Year', on_delete=models.CASCADE)
