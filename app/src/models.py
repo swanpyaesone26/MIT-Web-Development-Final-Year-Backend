@@ -1,12 +1,13 @@
 from django.db import models
+from django.contrib.auth.models import User
 
 #teacher db
 class Teacher(models.Model):
     teacher_id = models.AutoField(primary_key=True)
+    user = models.OneToOneField(User, on_delete=models.CASCADE)
     teacher_name = models.CharField(max_length=100)
     subject = models.OneToOneField('Subject', on_delete=models.CASCADE)
     year = models.OneToOneField('Year', on_delete=models.CASCADE)
-    password = models.CharField(max_length=100)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -19,10 +20,10 @@ class Teacher(models.Model):
 # student db
 class Student(models.Model):
     student_id = models.AutoField(primary_key=True)
+    user = models.OneToOneField(User, on_delete=models.CASCADE)
     student_name = models.CharField(max_length=100)
     rooms = models.ManyToManyField('Room')
     year = models.OneToOneField('Year', on_delete=models.CASCADE)
-    password = models.CharField(max_length=100)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

@@ -55,6 +55,29 @@ INSTALLED_APPS = [
     'app.src',
 ]
 
+# Unfold Admin settings
+from django.urls import reverse_lazy
+from django.utils.translation import gettext_lazy as _
+
+UNFOLD = {
+    "SITE_DROPDOWN": [
+        {
+            "icon": "diamond",
+            "title": _("Admin Dashboard"),
+            "link": "http://127.0.0.1:8000/admin/",
+            "attrs": {
+                "target": "_blank",
+            },
+        },
+        {
+            "icon": "diamond",
+            "title": _("Admin Dashboard"),
+            "link": reverse_lazy("admin:index"),
+        },
+    ]
+}
+
+
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
