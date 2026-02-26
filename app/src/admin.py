@@ -1,6 +1,5 @@
 from django.contrib import admin
 from .models import Teacher, Student, Year, Subject, Room
-from unfold.admin import ModelAdmin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.contrib.auth.admin import GroupAdmin as BaseGroupAdmin
 from django.contrib.auth.models import User, Group
@@ -12,8 +11,14 @@ from unfold.admin import ModelAdmin
 admin.site.unregister(User)
 admin.site.unregister(Group)
 
-admin.site.register(Teacher, ModelAdmin)
-admin.site.register(Student, ModelAdmin)
-admin.site.register(Year, ModelAdmin)
-admin.site.register(Subject, ModelAdmin)
-admin.site.register(Room, ModelAdmin)   
+@admin.register(User)
+class UserAdmin(BaseUserAdmin, ModelAdmin):
+    # Forms loaded from `unfold.forms`
+    form = UserChangeForm
+    add_form = UserCreationForm
+    change_password_form = AdminPasswordChangeForm
+
+
+@admin.register(Group)
+class GroupAdmin(BaseGroupAdmin, ModelAdmin):
+    pass
