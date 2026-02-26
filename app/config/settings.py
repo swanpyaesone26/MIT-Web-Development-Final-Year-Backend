@@ -65,21 +65,64 @@ from django.urls import reverse_lazy
 from django.utils.translation import gettext_lazy as _
 
 UNFOLD = {
-    "SITE_DROPDOWN": [
-        {
-            "icon": "diamond",
-            "title": _("Admin Dashboard"),
-            "link": "http://127.0.0.1:8000/admin/",
-            "attrs": {
-                "target": "_blank",
+    "SITE_TITLE": "School Management",
+    "SITE_HEADER": "School Management",
+    "SITE_SYMBOL": "school",
+    "SHOW_VIEW_ON_SITE": False,
+    "DASHBOARD_CALLBACK": "app.src.dashboard.dashboard_callback",
+    "SIDEBAR": {
+        "show_search": False,
+        "navigation": [
+            {
+                "title": _("Registeration"),
+                "icon": "school",
+                "items": [
+                    {
+                        "title": _("Teachers"),
+                        "icon": "badge",
+                        "link": reverse_lazy("admin:src_teacher_changelist"),
+                    },
+                    {
+                        "title": _("Students"),
+                        "icon": "person_outline",
+                        "link": reverse_lazy("admin:src_student_changelist"),
+                    },
+                    {
+                        "title": _("Years"),
+                        "icon": "calendar_today",
+                        "link": reverse_lazy("admin:src_year_changelist"),
+                    },
+                    {
+                        "title": _("Subjects"),
+                        "icon": "menu_book",
+                        "link": reverse_lazy("admin:src_subject_changelist"),
+                    },
+                    {
+                        "title": _("Rooms"),
+                        "icon": "meeting_room",
+                        "link": reverse_lazy("admin:src_room_changelist"),
+                    },
+                ],
             },
-        },
-        {
-            "icon": "diamond",
-            "title": _("Admin Dashboard"),
-            "link": reverse_lazy("admin:index"),
-        },
-    ]
+            {
+                "title": _("Authentication"),
+                "icon": "lock",
+                "collapsible": True,
+                "items": [
+                    {
+                        "title": _("Users"),
+                        "icon": "person",
+                        "link": reverse_lazy("admin:auth_user_changelist"),
+                    },
+                    {
+                        "title": _("Groups"),
+                        "icon": "group",
+                        "link": reverse_lazy("admin:auth_group_changelist"),
+                    },
+                ],
+            }
+        ],
+    },
 }
 
 
@@ -98,7 +141,7 @@ ROOT_URLCONF = 'app.config.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [BASE_DIR / 'templates'],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
