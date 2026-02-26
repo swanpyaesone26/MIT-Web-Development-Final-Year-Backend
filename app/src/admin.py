@@ -25,33 +25,33 @@ class GroupAdmin(BaseGroupAdmin, ModelAdmin):
 
 # need to register, maybe we do next this and other user models
 @admin.register(Teacher)
-class TeacherAdmin(admin.ModelAdmin):
-    list_display = ('teacher_id', 'teacher_name', 'subject', 'year', 'created_at', 'updated_at')
-    search_fields = ('teacher_name','subject','year')
+class TeacherAdmin(ModelAdmin):
+    list_display = ('teacher_id', 'user', 'teacher_name', 'subject', 'year', 'created_at', 'updated_at')
+    search_fields = ('teacher_name', 'subject__subject_name', 'year__year_name')
     ordering = ('year',)
 
 @admin.register(Student)
-class StudentAdmin(admin.ModelAdmin):
-    list_display = ('student_id', 'student_name', 'year', 'created_at', 'updated_at')
-    search_fields = ('student_name','year')
+class StudentAdmin(ModelAdmin):
+    list_display = ('student_id', 'user', 'student_name', 'year', 'created_at', 'updated_at')
+    search_fields = ('student_name', 'year__year_name')
     ordering = ('year',)
 
 @admin.register(Year)
-class YearAdmin(admin.ModelAdmin):
+class YearAdmin(ModelAdmin):
     list_display = ('year_id', 'year_name', 'created_at', 'updated_at')
     search_fields = ('year_name',)
     ordering = ('year_name',)
 
 @admin.register(Subject)
-class SubjectAdmin(admin.ModelAdmin):
+class SubjectAdmin(ModelAdmin):
     list_display = ('subject_id', 'subject_name', 'created_at', 'updated_at')
     search_fields = ('subject_name',)
     ordering = ('subject_name',)
 
 @admin.register(Room)
-class RoomAdmin(admin.ModelAdmin):
-    list_display = ('room_id', 'room_name', 'created_at', 'updated_at')
-    search_fields = ('room_name',)
+class RoomAdmin(ModelAdmin):
+    list_display = ('room_id', 'room_name', 'teacher', 'subject', 'year', 'created_at', 'updated_at')
+    search_fields = ('room_name', 'teacher__teacher_name', 'subject__subject_name', 'year__year_name')
     ordering = ('year',)
 
 
