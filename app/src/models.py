@@ -38,10 +38,6 @@ class Assignment(models.Model):
     assignment_id = models.AutoField(primary_key=True)
     teacher = models.ForeignKey(Teacher, on_delete=models.CASCADE)
     assignment_name = models.CharField(max_length=250)
-    subject = models.ForeignKey('Subject', on_delete=models.CASCADE)
-    rooms = models.ManyToManyField('Room')
-    student = models.ForeignKey(Student, on_delete=models.CASCADE)
-    score = models.FloatField()
     due_date = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -51,6 +47,22 @@ class Assignment(models.Model):
 
     class Meta:
         db_table = 'assignment'
+
+#submission db
+class Submission(models.Model):
+    submission_id = models.AutoField(primary_key=True)
+    assignment = models.ForeignKey(Assignment, on_delete=models.CASCADE)
+    student = models.ForeignKey(Student, on_delete=models.CASCADE)
+    file = models.FileField(upload_to='submissions/') # This is only for local development, when we deploy, we might use AWS S3 to store large files
+    score = models.FloatField(null=True, blank=True)
+    submitted_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.student} - {self.assignment}"
+
+    class Meta:
+        db_table = 'submission'
 
 #year db
 class Year(models.Model):
