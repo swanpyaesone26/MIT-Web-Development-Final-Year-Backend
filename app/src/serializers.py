@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from app.src.models import Student, Teacher, Assignment, Year, Room, Subject
+from app.src.models import Student, Teacher, Assignment, Submission, Year, Room, Subject
 
 # teacher serializer
 class TeacherSerializer(serializers.ModelSerializer):
@@ -36,3 +36,10 @@ class SubjectSerializer(serializers.ModelSerializer):
     class Meta:
         model = Subject
         fields = '__all__'
+
+# submission serializer
+class SubmissionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Submission
+        fields = '__all__'
+        read_only_fields = ('student', 'submitted_at', 'score')
