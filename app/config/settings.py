@@ -208,7 +208,7 @@ USE_TZ = True
 
 STATIC_URL = 'static/'
 
-# Media files (user uploads)
+# Media files (user uploads) [Student upload --> django save in app/media/submissions/homework.pdf (physical disk) --> Db store the path]
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
