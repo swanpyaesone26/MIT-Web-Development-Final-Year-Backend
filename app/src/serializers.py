@@ -18,6 +18,7 @@ class AssignmentSerializer(serializers.ModelSerializer):
     class Meta:
         model = Assignment
         fields = '__all__'
+        read_only_fields = ('teacher',)
 
 # year serializer
 class YearSerializer(serializers.ModelSerializer):
