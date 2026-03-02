@@ -35,7 +35,6 @@ FROM python:3.12-slim as runtime
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    VIRTUAL_ENV=/app/.venv \
     PATH="/app/.venv/bin:$PATH"
 
 # Install runtime system dependencies
@@ -52,12 +51,11 @@ COPY --from=builder /app/.venv /app/.venv
 # Copy application code
 COPY . /app/
 
-# Collect static files
-RUN python manage.py collectstatic --noinput
+# Don't run collectstatic during build (needs DB connection)
+# Run it manually: docker-compose exec web python manage.py collectstatic --noinput
 
-# Create non-root user for security
-RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
-USER appuser
+# Verify gunicorn is installed
+RUN which gunicorn && gunicorn --version
 
-# Run gunicorn
-CMD ["gunicorn", "app.config.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "3"]
+# Run gunicorn with full path (exec form doesn't expand PATH)
+CMD ["/app/.venv/bin/gunicorn", "app.config.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "3"]

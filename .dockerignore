@@ -26,5 +26,10 @@ coverage.xml
 media
 staticfiles
 .env
+.env.example
 .DS_Store
 node_modules
+docker-compose.yml
+README.md
+LICENSE
+Makefile

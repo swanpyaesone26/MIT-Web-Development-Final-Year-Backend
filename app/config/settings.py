@@ -207,11 +207,11 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
 
 STATIC_URL = 'static/'
-STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+STATIC_ROOT = BASE_DIR.parent / 'staticfiles'  # /app/staticfiles (for Docker/Nginx)
 
 # Media files (user uploads) [Student upload --> django save in app/media/submissions/homework.pdf (physical disk) --> Db store the path]
 MEDIA_URL = '/media/'
-MEDIA_ROOT = BASE_DIR / 'media'
+MEDIA_ROOT = BASE_DIR.parent / 'media'  # /app/media (for Docker/Nginx)
 
 # AWS S3 Configuration for Production Media Files
 USE_S3 = os.getenv('USE_S3', 'False') == 'True'
