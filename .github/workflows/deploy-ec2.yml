@@ -1,0 +1,33 @@
+name: Deploy to EC2
+
+on:
+  push:
+    branches:
+      - main  # Deploy when pushing to main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy to EC2
+        env:
+          PRIVATE_KEY: ${{ secrets.EC2_SSH_KEY }}
+          HOST: ${{ secrets.EC2_HOST }}
+          USER: ubuntu
+        run: |
+          # Save SSH key
+          echo "$PRIVATE_KEY" > private_key
+          chmod 600 private_key
+          
+          # Deploy via SSH
+          ssh -o StrictHostKeyChecking=no -i private_key ${USER}@${HOST} << 'EOF'
+            cd ~/your-repo-name
+            git pull origin main
+            docker-compose down
+            docker-compose up -d --build
+            docker-compose exec -T web python manage.py migrate
+            docker-compose exec -T web python manage.py collectstatic --noinput
+          EOF
