@@ -25,13 +25,21 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-zm+54ej8@yuc&mkddk#ya%v^a97yo%hr3sf2+nv&sik58mb7nd'
+SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-zm+54ej8@yuc&mkddk#ya%v^a97yo%hr3sf2+nv&sik58mb7nd')
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.getenv('DEBUG', 'True') == 'True'
 
 ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', '*').split(',')
 
+import sentry_sdk
+
+sentry_sdk.init(
+    dsn=os.getenv('SENTRY_DSN'),
+    # Add data like request headers and IP for users,
+    # see https://docs.sentry.io/platforms/python/data-management/data-collected/ for more info
+    send_default_pii=True,
+)
 
 # Application definition
 
@@ -125,6 +133,7 @@ UNFOLD = {
         ],
     },
 }
+
 
 
 MIDDLEWARE = [
