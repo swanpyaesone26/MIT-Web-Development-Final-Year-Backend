@@ -38,6 +38,7 @@ class Assignment(models.Model):
     assignment_id = models.AutoField(primary_key=True)
     teacher = models.ForeignKey(Teacher, on_delete=models.CASCADE)
     assignment_name = models.CharField(max_length=250)
+    description = models.TextField(blank=True, default='')
     due_date = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
