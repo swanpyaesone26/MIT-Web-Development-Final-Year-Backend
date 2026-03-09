@@ -3,117 +3,272 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.parsers import MultiPartParser, FormParser
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
+from rest_framework_simplejwt.tokens import RefreshToken
+from django.utils import timezone
+from django.db.models import Avg, F
 
 from app.src.models import Assignment, Submission, Teacher, Student, Room
-from app.src.serializers import AssignmentSerializer, SubmissionSerializer
+from app.src.serializers import (
+    AssignmentSerializer,
+    StudentAssignmentSerializer,
+    SubmissionSerializer,
+    StudentScoreSerializer,
+)
 
 
-# Teacher Views
+# ───────────── Response helpers ─────────────
+
+def success_response(data=None, message="", status_code=status.HTTP_200_OK):
+    response = {"status": "success", "message": message}
+    if data is not None:
+        response["data"] = data
+    return Response(response, status=status_code)
+
+
+def error_response(message, status_code=status.HTTP_400_BAD_REQUEST, errors=None):
+    response = {"status": "error", "message": message}
+    if errors is not None:
+        response["errors"] = errors
+    return Response(response, status=status_code)
+
+
+# ───────────────── Auth Views ─────────────────
+
+class CustomLoginView(APIView):
+    """Custom login view that wraps JWT tokens with user info."""
+
+    def post(self, request):
+        serializer = TokenObtainPairSerializer(data=request.data)
+        try:
+            serializer.is_valid(raise_exception=True)
+        except Exception:
+            return error_response("Invalid credentials.", status.HTTP_401_UNAUTHORIZED)
+
+        user = serializer.user
+        tokens = serializer.validated_data
+
+        role = 'unknown'
+        name = user.username
+        try:
+            role = 'teacher'
+            name = user.teacher.teacher_name
+        except Teacher.DoesNotExist:
+            try:
+                role = 'student'
+                name = user.student.student_name
+            except Student.DoesNotExist:
+                pass
+
+        return success_response(
+            data={
+                'user': {'id': user.id, 'name': name, 'role': role},
+                'tokens': {
+                    'accessToken': str(tokens['access']),
+                    'refreshToken': str(tokens['refresh']),
+                },
+            },
+            message="Login successful",
+        )
+
+
+class CustomTokenRefreshView(APIView):
+    """Custom refresh view that accepts refreshToken and returns accessToken."""
+
+    def post(self, request):
+        refresh_token = request.data.get('refreshToken') or request.data.get('refresh')
+        if not refresh_token:
+            return error_response("Refresh token is required.")
+        try:
+            token = RefreshToken(refresh_token)
+            return success_response(
+                data={'accessToken': str(token.access_token)},
+                message="Access token refreshed successfully",
+            )
+        except Exception:
+            return error_response("Invalid or expired refresh token.", status.HTTP_401_UNAUTHORIZED)
+
+
+# ───────────────── Teacher Views ─────────────────
 
 class TeacherAssignmentView(APIView):
-    """Teacher can get the list of their assignments and create new assignments."""
+    """List & create assignments for the authenticated teacher."""
     permission_classes = [IsAuthenticated]
 
-    # if teacher is authenticated, get all assignments for that teacher
     def get(self, request):
         try:
             teacher = request.user.teacher
         except Teacher.DoesNotExist:
-            return Response({'error': 'You are not a teacher.'}, status=status.HTTP_403_FORBIDDEN)
+            return error_response("You are not a teacher.", status.HTTP_403_FORBIDDEN)
 
-        assignments = Assignment.objects.filter(teacher=teacher)
+        assignments = Assignment.objects.filter(teacher=teacher).order_by('-created_at')
         serializer = AssignmentSerializer(assignments, many=True)
-        return Response(serializer.data)
+        return success_response(data=serializer.data, message="Assignments fetched successfully.")
 
-    # if teacher is authenticated, create a new assignment for that teacher
     def post(self, request):
         try:
             teacher = request.user.teacher
         except Teacher.DoesNotExist:
-            return Response({'error': 'You are not a teacher.'}, status=status.HTTP_403_FORBIDDEN)
+            return error_response("You are not a teacher.", status.HTTP_403_FORBIDDEN)
 
         serializer = AssignmentSerializer(data=request.data)
         if serializer.is_valid():
             serializer.save(teacher=teacher)
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            return success_response(
+                data=serializer.data,
+                message="Assignment created successfully.",
+                status_code=status.HTTP_201_CREATED,
+            )
+        return error_response("Validation failed.", status.HTTP_400_BAD_REQUEST, errors=serializer.errors)
+
+
+class TeacherAssignmentDetailView(APIView):
+    """Retrieve, update, or delete a single assignment."""
+    permission_classes = [IsAuthenticated]
+
+    def _get_assignment(self, request, assignment_id):
+        try:
+            teacher = request.user.teacher
+        except Teacher.DoesNotExist:
+            return None, error_response("You are not a teacher.", status.HTTP_403_FORBIDDEN)
+        try:
+            assignment = Assignment.objects.get(assignment_id=assignment_id, teacher=teacher)
+        except Assignment.DoesNotExist:
+            return None, error_response("Assignment not found.", status.HTTP_404_NOT_FOUND)
+        return assignment, None
+
+    def get(self, request, assignment_id):
+        assignment, err = self._get_assignment(request, assignment_id)
+        if err:
+            return err
+        serializer = AssignmentSerializer(assignment)
+        return success_response(data=serializer.data, message="Assignment fetched successfully.")
+
+    def put(self, request, assignment_id):
+        assignment, err = self._get_assignment(request, assignment_id)
+        if err:
+            return err
+        serializer = AssignmentSerializer(assignment, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return success_response(data=serializer.data, message="Assignment updated successfully.")
+        return error_response("Validation failed.", status.HTTP_400_BAD_REQUEST, errors=serializer.errors)
+
+    def delete(self, request, assignment_id):
+        assignment, err = self._get_assignment(request, assignment_id)
+        if err:
+            return err
+        assignment.delete()
+        return success_response(message="Assignment deleted successfully.")
+
+
+class TeacherAssignmentCloseView(APIView):
+    """Close an assignment early (sets due_date to now)."""
+    permission_classes = [IsAuthenticated]
+
+    def patch(self, request, assignment_id):
+        try:
+            teacher = request.user.teacher
+        except Teacher.DoesNotExist:
+            return error_response("You are not a teacher.", status.HTTP_403_FORBIDDEN)
+        try:
+            assignment = Assignment.objects.get(assignment_id=assignment_id, teacher=teacher)
+        except Assignment.DoesNotExist:
+            return error_response("Assignment not found.", status.HTTP_404_NOT_FOUND)
+
+        assignment.due_date = timezone.now()
+        assignment.save()
+        serializer = AssignmentSerializer(assignment)
+        return success_response(data=serializer.data, message="Assignment closed successfully.")
 
 
 class TeacherSubmissionListView(APIView):
-    """Teacher can view all submissions for a specific assignment."""
+    """Teacher views all submissions for a specific assignment."""
     permission_classes = [IsAuthenticated]
 
-    # check if teacher is authenticated, verify that assignment is belong to that teacher, get the assignment that belong to the requested teacher
     def get(self, request, assignment_id):
         try:
             teacher = request.user.teacher
         except Teacher.DoesNotExist:
-            return Response({'error': 'You are not a teacher.'}, status=status.HTTP_403_FORBIDDEN)
-
-        # Ensure the assignment belongs to this teacher
+            return error_response("You are not a teacher.", status.HTTP_403_FORBIDDEN)
         try:
             assignment = Assignment.objects.get(assignment_id=assignment_id, teacher=teacher)
         except Assignment.DoesNotExist:
-            return Response({'error': 'Assignment not found.'}, status=status.HTTP_404_NOT_FOUND)
+            return error_response("Assignment not found.", status.HTTP_404_NOT_FOUND)
 
-        submissions = Submission.objects.filter(assignment=assignment)
+        submissions = Submission.objects.filter(assignment=assignment).select_related('student', 'assignment')
         serializer = SubmissionSerializer(submissions, many=True)
-        return Response(serializer.data)
+        return success_response(data=serializer.data, message="Submissions fetched successfully.")
 
 
 class TeacherScoreView(APIView):
-    """Teacher can give score to a submission."""
+    """Teacher gives score to a submission."""
     permission_classes = [IsAuthenticated]
 
     def patch(self, request, submission_id):
         try:
             teacher = request.user.teacher
         except Teacher.DoesNotExist:
-            return Response({'error': 'You are not a teacher.'}, status=status.HTTP_403_FORBIDDEN)
+            return error_response("You are not a teacher.", status.HTTP_403_FORBIDDEN)
 
-        # Ensure the submission belongs to this teacher's assignment
         try:
-            submission = Submission.objects.get(
+            submission = Submission.objects.select_related('student').get(
                 submission_id=submission_id,
-                assignment__teacher=teacher
+                assignment__teacher=teacher,
             )
         except Submission.DoesNotExist:
-            return Response({'error': 'Submission not found.'}, status=status.HTTP_404_NOT_FOUND)
+            return error_response("Submission not found.", status.HTTP_404_NOT_FOUND)
 
         score = request.data.get('score')
         if score is None:
-            return Response({'error': 'Score is required.'}, status=status.HTTP_400_BAD_REQUEST)
+            return error_response("Score is required.")
 
         submission.score = score
         submission.save()
-        serializer = SubmissionSerializer(submission)
-        return Response(serializer.data)
+        data = {
+            'studentId': submission.student.student_id,
+            'name': submission.student.student_name,
+            'score': submission.score,
+            'submitted': True,
+            'attachments': [submission.file.url] if submission.file else [],
+        }
+        return success_response(data=data, message="Score updated successfully.")
 
 
-# Student Views
+# ───────────────── Student Views ─────────────────
 
 class StudentAssignmentView(APIView):
-    """Student can view assignments for their rooms."""
+    """Student views all assignments from their rooms (assignment dashboard)."""
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
         try:
             student = request.user.student
         except Student.DoesNotExist:
-            return Response({'error': 'You are not a student.'}, status=status.HTTP_403_FORBIDDEN)
+            return error_response("You are not a student.", status.HTTP_403_FORBIDDEN)
 
-        # Get all rooms the student belongs to
         student_rooms = student.rooms.all()
-        # Get teachers who own those rooms
         teachers = Teacher.objects.filter(room__in=student_rooms)
-        # Get assignments from those teachers
-        assignments = Assignment.objects.filter(teacher__in=teachers)
-        serializer = AssignmentSerializer(assignments, many=True)
-        return Response(serializer.data)
+        assignments = (
+            Assignment.objects
+            .filter(teacher__in=teachers)
+            .select_related('teacher', 'teacher__subject')
+            .order_by('-created_at')
+        )
+
+        # Build submission map to avoid N+1 queries
+        submissions = Submission.objects.filter(student=student, assignment__in=assignments)
+        submission_map = {s.assignment_id: s for s in submissions}
+
+        serializer = StudentAssignmentSerializer(
+            assignments, many=True,
+            context={'student': student, 'submission_map': submission_map},
+        )
+        return success_response(data=serializer.data, message="Assignments fetched successfully.")
 
 
 class StudentSubmitView(APIView):
-    """Student can submit a file for an assignment."""
+    """Student submits a file for an assignment (blocked after due date)."""
     permission_classes = [IsAuthenticated]
     parser_classes = [MultiPartParser, FormParser]
 
@@ -121,39 +276,147 @@ class StudentSubmitView(APIView):
         try:
             student = request.user.student
         except Student.DoesNotExist:
-            return Response({'error': 'You are not a student.'}, status=status.HTTP_403_FORBIDDEN)
+            return error_response("You are not a student.", status.HTTP_403_FORBIDDEN)
 
-        # Check the assignment exists and belongs to a room the student is in
         student_rooms = student.rooms.all()
         teachers = Teacher.objects.filter(room__in=student_rooms)
         try:
             assignment = Assignment.objects.get(assignment_id=assignment_id, teacher__in=teachers)
         except Assignment.DoesNotExist:
-            return Response({'error': 'Assignment not found.'}, status=status.HTTP_404_NOT_FOUND)
+            return error_response("Assignment not found.", status.HTTP_404_NOT_FOUND)
 
-        # Check if student already submitted
+        # Due-date check — block submission after deadline (like Google Classroom)
+        if assignment.due_date and timezone.now() > assignment.due_date:
+            return error_response(
+                "Assignment is closed. The due date has passed.",
+                status.HTTP_403_FORBIDDEN,
+            )
+
         if Submission.objects.filter(assignment=assignment, student=student).exists():
-            return Response({'error': 'You have already submitted this assignment.'}, status=status.HTTP_400_BAD_REQUEST)
+            return error_response("You have already submitted this assignment.")
 
         serializer = SubmissionSerializer(data=request.data)
         if serializer.is_valid():
-            serializer.save(assignment=assignment, student=student)
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            submission = serializer.save(assignment=assignment, student=student)
+            data = {
+                'assignmentId': assignment.assignment_id,
+                'studentId': student.student_id,
+                'submitted': True,
+                'file': submission.file.url if submission.file else None,
+                'score': None,
+                'submittedAt': submission.submitted_at,
+            }
+            return success_response(
+                data=data,
+                message="Assignment submitted successfully.",
+                status_code=status.HTTP_201_CREATED,
+            )
+        return error_response("Validation failed.", status.HTTP_400_BAD_REQUEST, errors=serializer.errors)
 
 
 class StudentScoreView(APIView):
-    """Student can view their own scores."""
+    """Student views their scores for all submitted assignments."""
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
         try:
             student = request.user.student
         except Student.DoesNotExist:
-            return Response({'error': 'You are not a student.'}, status=status.HTTP_403_FORBIDDEN)
+            return error_response("You are not a student.", status.HTTP_403_FORBIDDEN)
 
-        submissions = Submission.objects.filter(student=student)
-        serializer = SubmissionSerializer(submissions, many=True)
-        return Response(serializer.data)
+        submissions = Submission.objects.filter(student=student).select_related(
+            'assignment', 'assignment__teacher', 'assignment__teacher__subject',
+        )
+        serializer = StudentScoreSerializer(submissions, many=True)
+        return success_response(data=serializer.data, message="Scores fetched successfully.")
+
+
+class StudentBarChartView(APIView):
+    """Returns average scores grouped by subject for bar chart display."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        try:
+            student = request.user.student
+        except Student.DoesNotExist:
+            return error_response("You are not a student.", status.HTTP_403_FORBIDDEN)
+
+        scores = list(
+            Submission.objects
+            .filter(student=student, score__isnull=False)
+            .values(subject=F('assignment__teacher__subject__subject_name'))
+            .annotate(score=Avg('score'))
+            .order_by('subject')
+        )
+        return success_response(data=scores, message="Scores fetched successfully.")
+
+
+# ───────────────── Profile View ─────────────────
+
+class UserProfileView(APIView):
+    """Returns user type and profile information after login."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+
+        # Check if user is a teacher
+        try:
+            teacher = user.teacher
+            rooms = Room.objects.filter(teacher=teacher)
+            return success_response(
+                data={
+                    'user_type': 'teacher',
+                    'user_id': user.id,
+                    'username': user.username,
+                    'email': user.email,
+                    'profile': {
+                        'teacher_id': teacher.teacher_id,
+                        'teacher_name': teacher.teacher_name,
+                        'subject': {
+                            'subject_id': teacher.subject.subject_id,
+                            'subject_name': teacher.subject.subject_name,
+                        },
+                        'year': {
+                            'year_id': teacher.year.year_id,
+                            'year_name': teacher.year.year_name,
+                        },
+                        'rooms': [{'room_id': r.room_id, 'room_name': r.room_name} for r in rooms],
+                    },
+                },
+                message="Profile fetched successfully.",
+            )
+        except Teacher.DoesNotExist:
+            pass
+
+        # Check if user is a student
+        try:
+            student = user.student
+            student_rooms = student.rooms.all()
+            return success_response(
+                data={
+                    'user_type': 'student',
+                    'user_id': user.id,
+                    'username': user.username,
+                    'email': user.email,
+                    'profile': {
+                        'student_id': student.student_id,
+                        'student_name': student.student_name,
+                        'year': {
+                            'year_id': student.year.year_id,
+                            'year_name': student.year.year_name,
+                        },
+                        'rooms': [{'room_id': r.room_id, 'room_name': r.room_name} for r in student_rooms],
+                    },
+                },
+                message="Profile fetched successfully.",
+            )
+        except Student.DoesNotExist:
+            pass
+
+        return error_response(
+            "User profile not found. User is neither a teacher nor a student.",
+            status.HTTP_404_NOT_FOUND,
+        )
 
 

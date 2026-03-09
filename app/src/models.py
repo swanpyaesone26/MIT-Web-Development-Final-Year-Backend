@@ -4,10 +4,10 @@ from django.contrib.auth.models import User
 #teacher db
 class Teacher(models.Model):
     teacher_id = models.AutoField(primary_key=True)
-    user = models.OneToOneField(User, on_delete=models.CASCADE)
+    user = models.OneToOneField(User, on_delete=models.CASCADE, null=True, blank=True)
     teacher_name = models.CharField(max_length=100)
     subject = models.OneToOneField('Subject', on_delete=models.CASCADE)
-    year = models.OneToOneField('Year', on_delete=models.CASCADE)
+    year = models.ForeignKey('Year', on_delete=models.CASCADE)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -20,10 +20,10 @@ class Teacher(models.Model):
 # student db
 class Student(models.Model):
     student_id = models.AutoField(primary_key=True)
-    user = models.OneToOneField(User, on_delete=models.CASCADE)
+    user = models.OneToOneField(User, on_delete=models.CASCADE, null=True, blank=True)
     student_name = models.CharField(max_length=100)
     rooms = models.ManyToManyField('Room')
-    year = models.OneToOneField('Year', on_delete=models.CASCADE)
+    year = models.ForeignKey('Year', on_delete=models.CASCADE)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -38,6 +38,7 @@ class Assignment(models.Model):
     assignment_id = models.AutoField(primary_key=True)
     teacher = models.ForeignKey(Teacher, on_delete=models.CASCADE)
     assignment_name = models.CharField(max_length=250)
+    description = models.TextField(blank=True, default='')
     due_date = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -82,8 +83,8 @@ class Room(models.Model):
     room_id = models.AutoField(primary_key=True)
     room_name = models.CharField(max_length=100, unique=True)
     teacher = models.OneToOneField('Teacher', on_delete=models.CASCADE)
-    subject = models.OneToOneField('Subject', on_delete=models.CASCADE)
-    year = models.OneToOneField('Year', on_delete=models.CASCADE)
+    subject = models.ForeignKey('Subject', on_delete=models.CASCADE)
+    year = models.ForeignKey('Year', on_delete=models.CASCADE)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
