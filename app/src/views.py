@@ -3,7 +3,10 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.parsers import MultiPartParser, FormParser
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
+from rest_framework_simplejwt.tokens import RefreshToken
 from django.utils import timezone
+from django.db.models import Avg, F
 
 from app.src.models import Assignment, Submission, Teacher, Student, Room
 from app.src.serializers import (
@@ -28,6 +31,62 @@ def error_response(message, status_code=status.HTTP_400_BAD_REQUEST, errors=None
     if errors is not None:
         response["errors"] = errors
     return Response(response, status=status_code)
+
+
+# ───────────────── Auth Views ─────────────────
+
+class CustomLoginView(APIView):
+    """Custom login view that wraps JWT tokens with user info."""
+
+    def post(self, request):
+        serializer = TokenObtainPairSerializer(data=request.data)
+        try:
+            serializer.is_valid(raise_exception=True)
+        except Exception:
+            return error_response("Invalid credentials.", status.HTTP_401_UNAUTHORIZED)
+
+        user = serializer.user
+        tokens = serializer.validated_data
+
+        role = 'unknown'
+        name = user.username
+        try:
+            role = 'teacher'
+            name = user.teacher.teacher_name
+        except Teacher.DoesNotExist:
+            try:
+                role = 'student'
+                name = user.student.student_name
+            except Student.DoesNotExist:
+                pass
+
+        return success_response(
+            data={
+                'user': {'id': user.id, 'name': name, 'role': role},
+                'tokens': {
+                    'accessToken': str(tokens['access']),
+                    'refreshToken': str(tokens['refresh']),
+                },
+            },
+            message="Login successful",
+        )
+
+
+class CustomTokenRefreshView(APIView):
+    """Custom refresh view that accepts refreshToken and returns accessToken."""
+
+    def post(self, request):
+        refresh_token = request.data.get('refreshToken') or request.data.get('refresh')
+        if not refresh_token:
+            return error_response("Refresh token is required.")
+        try:
+            token = RefreshToken(refresh_token)
+            return success_response(
+                data={'accessToken': str(token.access_token)},
+                message="Access token refreshed successfully",
+            )
+        except Exception:
+            return error_response("Invalid or expired refresh token.", status.HTTP_401_UNAUTHORIZED)
 
 
 # ───────────────── Teacher Views ─────────────────
@@ -153,7 +212,7 @@ class TeacherScoreView(APIView):
             return error_response("You are not a teacher.", status.HTTP_403_FORBIDDEN)
 
         try:
-            submission = Submission.objects.get(
+            submission = Submission.objects.select_related('student').get(
                 submission_id=submission_id,
                 assignment__teacher=teacher,
             )
@@ -166,8 +225,14 @@ class TeacherScoreView(APIView):
 
         submission.score = score
         submission.save()
-        serializer = SubmissionSerializer(submission)
-        return success_response(data=serializer.data, message="Score given successfully.")
+        data = {
+            'studentId': submission.student.student_id,
+            'name': submission.student.student_name,
+            'score': submission.score,
+            'submitted': True,
+            'attachments': [submission.file.url] if submission.file else [],
+        }
+        return success_response(data=data, message="Score updated successfully.")
 
 
 # ───────────────── Student Views ─────────────────
@@ -232,9 +297,17 @@ class StudentSubmitView(APIView):
 
         serializer = SubmissionSerializer(data=request.data)
         if serializer.is_valid():
-            serializer.save(assignment=assignment, student=student)
+            submission = serializer.save(assignment=assignment, student=student)
+            data = {
+                'assignmentId': assignment.assignment_id,
+                'studentId': student.student_id,
+                'submitted': True,
+                'file': submission.file.url if submission.file else None,
+                'score': None,
+                'submittedAt': submission.submitted_at,
+            }
             return success_response(
-                data=serializer.data,
+                data=data,
                 message="Assignment submitted successfully.",
                 status_code=status.HTTP_201_CREATED,
             )
@@ -256,6 +329,26 @@ class StudentScoreView(APIView):
         )
         serializer = StudentScoreSerializer(submissions, many=True)
         return success_response(data=serializer.data, message="Scores fetched successfully.")
+
+
+class StudentBarChartView(APIView):
+    """Returns average scores grouped by subject for bar chart display."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        try:
+            student = request.user.student
+        except Student.DoesNotExist:
+            return error_response("You are not a student.", status.HTTP_403_FORBIDDEN)
+
+        scores = list(
+            Submission.objects
+            .filter(student=student, score__isnull=False)
+            .values(subject=F('assignment__teacher__subject__subject_name'))
+            .annotate(score=Avg('score'))
+            .order_by('subject')
+        )
+        return success_response(data=scores, message="Scores fetched successfully.")
 
 
 # ───────────────── Profile View ─────────────────
