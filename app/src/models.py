@@ -7,7 +7,7 @@ class Teacher(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, null=True, blank=True)
     teacher_name = models.CharField(max_length=100)
     subject = models.OneToOneField('Subject', on_delete=models.CASCADE)
-    year = models.OneToOneField('Year', on_delete=models.CASCADE)
+    year = models.ForeignKey('Year', on_delete=models.CASCADE)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -23,7 +23,7 @@ class Student(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, null=True, blank=True)
     student_name = models.CharField(max_length=100)
     rooms = models.ManyToManyField('Room')
-    year = models.OneToOneField('Year', on_delete=models.CASCADE)
+    year = models.ForeignKey('Year', on_delete=models.CASCADE)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -83,8 +83,8 @@ class Room(models.Model):
     room_id = models.AutoField(primary_key=True)
     room_name = models.CharField(max_length=100, unique=True)
     teacher = models.OneToOneField('Teacher', on_delete=models.CASCADE)
-    subject = models.OneToOneField('Subject', on_delete=models.CASCADE)
-    year = models.OneToOneField('Year', on_delete=models.CASCADE)
+    subject = models.ForeignKey('Subject', on_delete=models.CASCADE)
+    year = models.ForeignKey('Year', on_delete=models.CASCADE)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
