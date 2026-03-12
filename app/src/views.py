@@ -102,7 +102,7 @@ class TeacherAssignmentView(APIView):
             return error_response("You are not a teacher.", status.HTTP_403_FORBIDDEN)
 
         assignments = Assignment.objects.filter(teacher=teacher).order_by('-created_at')
-        serializer = AssignmentSerializer(assignments, many=True)
+        serializer = AssignmentSerializer(assignments, many=True, context={'request': request})
         return success_response(data=serializer.data, message="Assignments fetched successfully.")
 
     def post(self, request):
@@ -141,14 +141,14 @@ class TeacherAssignmentDetailView(APIView):
         assignment, err = self._get_assignment(request, assignment_id)
         if err:
             return err
-        serializer = AssignmentSerializer(assignment)
+        serializer = AssignmentSerializer(assignment, context={'request': request})
         return success_response(data=serializer.data, message="Assignment fetched successfully.")
 
     def put(self, request, assignment_id):
         assignment, err = self._get_assignment(request, assignment_id)
         if err:
             return err
-        serializer = AssignmentSerializer(assignment, data=request.data, partial=True)
+        serializer = AssignmentSerializer(assignment, data=request.data, partial=True, context={'request': request})
         if serializer.is_valid():
             serializer.save()
             return success_response(data=serializer.data, message="Assignment updated successfully.")
@@ -178,7 +178,7 @@ class TeacherAssignmentCloseView(APIView):
 
         assignment.due_date = timezone.now()
         assignment.save()
-        serializer = AssignmentSerializer(assignment)
+        serializer = AssignmentSerializer(assignment, context={'request': request})
         return success_response(data=serializer.data, message="Assignment closed successfully.")
 
 
@@ -197,7 +197,7 @@ class TeacherSubmissionListView(APIView):
             return error_response("Assignment not found.", status.HTTP_404_NOT_FOUND)
 
         submissions = Submission.objects.filter(assignment=assignment).select_related('student', 'assignment')
-        serializer = SubmissionSerializer(submissions, many=True)
+        serializer = SubmissionSerializer(submissions, many=True, context={'request': request})
         return success_response(data=serializer.data, message="Submissions fetched successfully.")
 
 
@@ -225,12 +225,15 @@ class TeacherScoreView(APIView):
 
         submission.score = score
         submission.save()
+        file_url = None
+        if submission.file:
+            file_url = request.build_absolute_uri(submission.file.url)
         data = {
             'studentId': submission.student.student_id,
             'name': submission.student.student_name,
             'score': submission.score,
             'submitted': True,
-            'attachments': [submission.file.url] if submission.file else [],
+            'file': file_url,
         }
         return success_response(data=data, message="Score updated successfully.")
 
@@ -262,7 +265,7 @@ class StudentAssignmentView(APIView):
 
         serializer = StudentAssignmentSerializer(
             assignments, many=True,
-            context={'student': student, 'submission_map': submission_map},
+            context={'request': request, 'student': student, 'submission_map': submission_map},
         )
         return success_response(data=serializer.data, message="Assignments fetched successfully.")
 
@@ -298,11 +301,14 @@ class StudentSubmitView(APIView):
         serializer = SubmissionSerializer(data=request.data)
         if serializer.is_valid():
             submission = serializer.save(assignment=assignment, student=student)
+            file_url = None
+            if submission.file:
+                file_url = request.build_absolute_uri(submission.file.url)
             data = {
                 'assignmentId': assignment.assignment_id,
                 'studentId': student.student_id,
                 'submitted': True,
-                'file': submission.file.url if submission.file else None,
+                'file': file_url,
                 'score': None,
                 'submittedAt': submission.submitted_at,
             }
@@ -327,7 +333,7 @@ class StudentScoreView(APIView):
         submissions = Submission.objects.filter(student=student).select_related(
             'assignment', 'assignment__teacher', 'assignment__teacher__subject',
         )
-        serializer = StudentScoreSerializer(submissions, many=True)
+        serializer = StudentScoreSerializer(submissions, many=True, context={'request': request})
         return success_response(data=serializer.data, message="Scores fetched successfully.")
 
 

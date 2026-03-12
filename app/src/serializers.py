@@ -84,7 +84,7 @@ class StudentAssignmentSerializer(serializers.ModelSerializer):
     subject = serializers.CharField(source='teacher.subject.subject_name', read_only=True)
     score = serializers.SerializerMethodField()
     submitted = serializers.SerializerMethodField()
-    files = serializers.SerializerMethodField()
+    file = serializers.SerializerMethodField()
     status = serializers.SerializerMethodField()
 
     class Meta:
@@ -92,7 +92,7 @@ class StudentAssignmentSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'title', 'description',
             'dueDate', 'subject',
-            'score', 'submitted', 'files',
+            'score', 'submitted', 'file',
             'status',
         ]
 
@@ -107,11 +107,14 @@ class StudentAssignmentSerializer(serializers.ModelSerializer):
     def get_submitted(self, obj):
         return self._get_submission(obj) is not None
 
-    def get_files(self, obj):
+    def get_file(self, obj):
         submission = self._get_submission(obj)
         if submission and submission.file:
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(submission.file.url)
             return submission.file.url
-        return ""
+        return None
 
     def get_status(self, obj):
         if obj.due_date and timezone.now() > obj.due_date:
